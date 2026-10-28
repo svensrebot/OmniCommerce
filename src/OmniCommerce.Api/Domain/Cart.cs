@@ -2,6 +2,8 @@ namespace OmniCommerce.Api.Domain;
 
 public class Cart
 {
+    public const int MaxItemQuantity = 10_000;
+
     private readonly List<CartItem> _items = [];
 
     private Cart() { }
@@ -32,7 +34,7 @@ public class Cart
 
     public CartItem AddItem(Guid productId, int quantity, DateTimeOffset now)
     {
-        EnsurePositive(quantity);
+        EnsureValidQuantity(quantity);
 
         var item = _items.FirstOrDefault(i => i.ProductId == productId);
         if (item is null)
@@ -42,7 +44,7 @@ public class Cart
         }
         else
         {
-            item.Quantity += quantity;
+            item.Quantity = EnsureValidQuantity(item.Quantity + quantity);
         }
 
         UpdatedAt = now;
@@ -51,7 +53,7 @@ public class Cart
 
     public bool SetItemQuantity(Guid productId, int quantity, DateTimeOffset now)
     {
-        EnsurePositive(quantity);
+        EnsureValidQuantity(quantity);
 
         var item = _items.FirstOrDefault(i => i.ProductId == productId);
         if (item is null)
@@ -77,8 +79,15 @@ public class Cart
         return true;
     }
 
-    internal static int EnsurePositive(int quantity) =>
-        quantity > 0
+    public void Clear(DateTimeOffset now)
+    {
+        _items.Clear();
+        UpdatedAt = now;
+    }
+
+    internal static int EnsureValidQuantity(int quantity) =>
+        quantity is > 0 and <= MaxItemQuantity
             ? quantity
-            : throw new ArgumentOutOfRangeException(nameof(quantity), quantity, "Quantity must be positive.");
+            : throw new ArgumentOutOfRangeException(
+                nameof(quantity), quantity, $"Quantity must be between 1 and {MaxItemQuantity}.");
 }

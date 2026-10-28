@@ -66,6 +66,29 @@ public class CartTests
     }
 
     [Fact]
+    public void AddItem_MergedQuantityAboveMaximum_ThrowsAndKeepsQuantity()
+    {
+        var cart = Cart.Create(T0);
+        cart.AddItem(ProductId, Cart.MaxItemQuantity, T0);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => cart.AddItem(ProductId, 1, T1));
+        Assert.Equal(Cart.MaxItemQuantity, cart.Items.Single().Quantity);
+    }
+
+    [Fact]
+    public void Clear_RemovesAllLinesAndTouchesCart()
+    {
+        var cart = Cart.Create(T0);
+        cart.AddItem(ProductId, 1, T0);
+        cart.AddItem(Guid.NewGuid(), 1, T0);
+
+        cart.Clear(T1);
+
+        Assert.Empty(cart.Items);
+        Assert.Equal(T1, cart.UpdatedAt);
+    }
+
+    [Fact]
     public void RemoveItem_RemovesLineAndTouchesCart()
     {
         var cart = Cart.Create(T0);

@@ -9,7 +9,7 @@ public class CartItem
         Id = id;
         CartId = cartId;
         ProductId = productId;
-        Quantity = Cart.EnsurePositive(quantity);
+        Quantity = Cart.EnsureValidQuantity(quantity);
     }
 
     public Guid Id { get; private set; }
