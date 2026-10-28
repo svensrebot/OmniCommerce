@@ -192,10 +192,10 @@ We would revisit these choices when there is a concrete reason: sustained SQL re
 
 The executable prototype is **only a Cart Web API**, not the complete commerce platform. Its planned scope is:
 
-- [ ] SQL Server persistence with EF Core migrations
-- [ ] Cart operations and business validation
-- [ ] Optimistic concurrency using SQL Server `rowversion`
-- [ ] Basic structured logging and a health endpoint
-- [ ] Reproducible Docker Compose startup, documented in `README.md`
+- [x] SQL Server persistence with EF Core migrations
+- [x] Cart operations and business validation
+- [x] Optimistic concurrency using SQL Server `rowversion`
+- [x] Basic structured logging and a health endpoint
+- [x] Reproducible Docker Compose startup, documented in `README.md`
 
-These remain **planned until implemented and tested**. Payments, stock reservation, real identity-provider integration, search, Redis, CDN, Azure deployment and full monitoring are outside prototype scope. The single `OmniCommerce.Api` production project organizes code into `Controllers/`, `Application/`, `Domain/` and `Infrastructure/` folders; these are conventions, not separately enforced assembly boundaries.
+The items above are implemented and were verified as described in `README.md` (Docker-backed verification script). Payments, stock reservation, real identity-provider integration, search, Redis, CDN, Azure deployment and full monitoring are outside prototype scope and were **not** implemented. The single `OmniCommerce.Api` production project organizes code into `Controllers/`, `Application/`, `Domain/` and `Infrastructure/` folders; these are conventions, not separately enforced assembly boundaries.

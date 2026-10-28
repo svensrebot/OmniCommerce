@@ -138,6 +138,35 @@ public class CartApiTests(SqlServerFixture sql) : IClassFixture<SqlServerFixture
     }
 
     [SqlServerFact]
+    public async Task MissingOrEmptyProductId_Returns400_AndKeepsTheETag()
+    {
+        var (id, etag) = await PopulatedCartAsync();
+
+        var missing = await SendAsync(HttpMethod.Post, $"/api/carts/{id}/items", etag, new { quantity = 1 });
+        var empty = await SendAsync(HttpMethod.Post, $"/api/carts/{id}/items", etag, new { productId = Guid.Empty, quantity = 1 });
+
+        await AssertProblemAsync(missing, HttpStatusCode.BadRequest);
+        await AssertProblemAsync(empty, HttpStatusCode.BadRequest);
+        await AssertUnchangedAsync(id, etag);
+    }
+
+    [SqlServerFact]
+    public async Task MalformedJsonBody_Returns400_AndKeepsTheETag()
+    {
+        var (id, etag) = await PopulatedCartAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/carts/{id}/items")
+        {
+            Content = new StringContent("{not json", System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        var response = await Client.SendAsync(request);
+
+        await AssertProblemAsync(response, HttpStatusCode.BadRequest);
+        await AssertUnchangedAsync(id, etag);
+    }
+
+    [SqlServerFact]
     public async Task MissingQuantity_Returns400()
     {
         var (id, etag) = await PopulatedCartAsync();

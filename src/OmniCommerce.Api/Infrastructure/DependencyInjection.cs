@@ -11,6 +11,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'CommerceDb' is not configured.");
 
         services.AddDbContext<CommerceDbContext>(options => options.UseSqlServer(connectionString));
+        services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
         return services;
     }
 }

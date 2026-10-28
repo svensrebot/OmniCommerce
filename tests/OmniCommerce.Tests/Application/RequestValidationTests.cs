@@ -18,6 +18,10 @@ public class RequestValidationTests
     public void AddItemRequest_QuantityMustBeWithinRange(int quantity, bool expected) =>
         Assert.Equal(expected, IsValid(new AddCartItemRequest { ProductId = Guid.NewGuid(), Quantity = quantity }));
 
+    [Fact]
+    public void AddItemRequest_EmptyProductId_IsInvalid() =>
+        Assert.False(IsValid(new AddCartItemRequest { ProductId = Guid.Empty, Quantity = 1 }));
+
     [Theory]
     [InlineData(0, false)]
     [InlineData(-1, false)]

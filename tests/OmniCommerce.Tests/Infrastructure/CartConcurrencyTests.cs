@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniCommerce.Api.Application;
 using OmniCommerce.Api.Domain;
 using OmniCommerce.Api.Infrastructure;
@@ -13,7 +14,7 @@ public class CartConcurrencyTests(SqlServerFixture sql) : IClassFixture<SqlServe
     private async Task<T> WithService<T>(Func<CartService, Task<T>> action)
     {
         await using var db = sql.CreateContext();
-        return await action(new CartService(db, TimeProvider.System));
+        return await action(new CartService(db, TimeProvider.System, NullLogger<CartService>.Instance));
     }
 
     private async Task<(Guid Id, byte[] Version)> NewCartAsync()

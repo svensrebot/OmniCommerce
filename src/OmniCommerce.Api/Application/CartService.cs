@@ -5,13 +5,14 @@ using OmniCommerce.Api.Infrastructure;
 
 namespace OmniCommerce.Api.Application;
 
-public class CartService(CommerceDbContext db, TimeProvider clock) : ICartService
+public class CartService(CommerceDbContext db, TimeProvider clock, ILogger<CartService> logger) : ICartService
 {
     public async Task<CartResult> CreateAsync(CancellationToken ct)
     {
         var cart = Cart.Create(clock.GetUtcNow());
         db.Carts.Add(cart);
         await db.SaveChangesAsync(ct);
+        logger.LogInformation("Created cart {CartId}", cart.Id);
         return await SuccessAsync(cart, ct);
     }
 
@@ -77,6 +78,11 @@ public class CartService(CommerceDbContext db, TimeProvider clock) : ICartServic
         if (updated == 0)
         {
             var exists = await db.Carts.AnyAsync(c => c.Id == cartId, ct);
+            if (exists)
+            {
+                logger.LogInformation("Cart {CartId}: mutation rejected, the supplied ETag is stale", cartId);
+            }
+
             return new(exists ? CartOutcome.PreconditionFailed : CartOutcome.CartNotFound);
         }
 
@@ -96,11 +102,13 @@ public class CartService(CommerceDbContext db, TimeProvider clock) : ICartServic
         }
         catch (DbUpdateConcurrencyException)
         {
+            logger.LogWarning("Cart {CartId}: mutation rolled back by a concurrency conflict after the version check", cartId);
             return new(CartOutcome.PreconditionFailed);
         }
         catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
         {
             // A duplicate (CartId, ProductId) line can only come from a writer that changed the cart first.
+            logger.LogWarning("Cart {CartId}: mutation rolled back by a duplicate-line conflict", cartId);
             return new(CartOutcome.PreconditionFailed);
         }
 

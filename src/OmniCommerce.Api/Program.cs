@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OmniCommerce.Api.Application;
 using OmniCommerce.Api.Infrastructure;
 
@@ -24,6 +25,10 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.MapControllers();
+
+// Liveness runs no checks, so it stays 200 while SQL Server is down; readiness checks the database.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
 app.Run();
 
