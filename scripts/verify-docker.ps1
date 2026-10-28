@@ -18,9 +18,15 @@
 
 .PARAMETER Down
     Stop and remove the containers afterwards (the SQL Server data volume is kept).
+
+.PARAMETER ResultsDirectory
+    Keep the TRX test results in this directory (used by CI to upload them). By default they go to a
+    temporary directory that is deleted when the script ends.
+
+    Works on Windows PowerShell 5.1 and PowerShell 7 (Linux/macOS); CI runs it with pwsh.
 #>
 [CmdletBinding()]
-param([switch]$Down)
+param([switch]$Down, [string]$ResultsDirectory)
 
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -31,7 +37,9 @@ function Fail([string]$message) {
 }
 
 $password = if ($env:MSSQL_SA_PASSWORD) { $env:MSSQL_SA_PASSWORD } else { 'Dev_Only_Passw0rd!' }
-$resultsDir = Join-Path ([IO.Path]::GetTempPath()) ("omnicommerce-verify-" + [guid]::NewGuid().ToString('N'))
+$keepResults = [bool]$ResultsDirectory
+$resultsDir = if ($keepResults) { [IO.Path]::GetFullPath($ResultsDirectory) }
+              else { Join-Path ([IO.Path]::GetTempPath()) ("omnicommerce-verify-" + [guid]::NewGuid().ToString('N')) }
 
 try {
     Write-Host '== 1/4 docker compose up --build -d --wait' -ForegroundColor Cyan
@@ -42,14 +50,14 @@ try {
     $created = $null
     for ($attempt = 1; $attempt -le 30 -and -not $created; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri 'http://localhost:8080/api/carts' -Method POST -UseBasicParsing
+            $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8080/api/carts' -Method POST -UseBasicParsing
             if ([int]$response.StatusCode -eq 201 -and $response.Headers['ETag']) { $created = $response }
         } catch {
             Start-Sleep -Seconds 2
         }
     }
-    if (-not $created) { Fail 'POST http://localhost:8080/api/carts did not return 201 with an ETag.' }
-    Write-Host ("   201 Created, ETag {0}" -f $created.Headers['ETag'])
+    if (-not $created) { Fail 'POST http://127.0.0.1:8080/api/carts did not return 201 with an ETag.' }
+    Write-Host ("   201 Created, ETag {0}" -f ($created.Headers['ETag'] -join ','))
 
     Write-Host '== 3/4 dotnet test (all tests, SQL Server required)' -ForegroundColor Cyan
     $env:OMNICOMMERCE_TEST_SQLSERVER = "Server=127.0.0.1,1433;User Id=sa;Password=$password;TrustServerCertificate=True"
@@ -61,7 +69,7 @@ try {
     $trx = Join-Path $resultsDir 'verify.trx'
     if (-not (Test-Path $trx)) { Fail 'No TRX result file was produced (tests were not run).' }
 
-    $results = @(([xml](Get-Content $trx)).TestRun.Results.UnitTestResult)
+    $results = @(([xml](Get-Content -Raw $trx)).TestRun.Results.UnitTestResult)
     $passed = @($results | Where-Object { $_.outcome -eq 'Passed' }).Count
     $failed = @($results | Where-Object { $_.outcome -eq 'Failed' }).Count
     $skipped = $results.Count - $passed - $failed
@@ -80,6 +88,6 @@ try {
     Write-Host 'VERIFICATION PASSED: all tests ran against the Docker SQL Server; none skipped.' -ForegroundColor Green
 }
 finally {
-    if (Test-Path $resultsDir) { Remove-Item $resultsDir -Recurse -Force }
+    if (-not $keepResults -and (Test-Path $resultsDir)) { Remove-Item $resultsDir -Recurse -Force }
     if ($Down) { docker compose down }
 }

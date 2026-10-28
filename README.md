@@ -43,7 +43,7 @@ How concurrency works:
 
 - **Docker Desktop** (or Docker Engine + Compose v2) — required for `docker compose up` and the full verification.
 - **.NET 8 SDK or newer** — only to build/test on the host. (Developed with SDK 10 targeting `net8.0`; the .NET 8 runtime is needed to run tests.)
-- **Windows PowerShell** for `scripts/verify-docker.ps1`. If your execution policy blocks local scripts (e.g. `AllSigned`), run it as `powershell -ExecutionPolicy Bypass -File scripts\verify-docker.ps1`; this affects that process only.
+- **PowerShell** for `scripts/verify-docker.ps1`: Windows PowerShell 5.1 or PowerShell 7 (`pwsh`, also on Linux/macOS). If your Windows execution policy blocks local scripts (e.g. `AllSigned`), run it as `powershell -ExecutionPolicy Bypass -File scripts\verify-docker.ps1`; this affects that process only.
 
 ## Run with Docker Compose
 
@@ -168,6 +168,12 @@ powershell -ExecutionPolicy Bypass -File scripts\verify-docker.ps1      # add -D
 
 The script (1) runs `docker compose up --build -d --wait`, (2) sends a real `POST /api/carts` to the API container, (3) runs **all** tests against the Docker SQL Server with `OMNICOMMERCE_REQUIRE_SQLSERVER_TESTS=1` (so missing or unreachable SQL Server makes tests fail instead of skip) and (4) parses the TRX result. It exits non-zero unless every test passed, none was skipped or not executed, and both SQL Server-backed test classes were discovered. Exit code 0 means fully verified.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on **pull requests to `main`** and **pushes to `main`** (GitHub-hosted `ubuntu-latest`, .NET 8 via `actions/setup-dotnet`, read-only `contents` permission). It restores and builds the solution, then runs `scripts/verify-docker.ps1` with `pwsh`, i.e. the same strict verification as above: it starts the API and SQL Server from `docker-compose.yml`, sends a real HTTP request, and runs **all** tests against that SQL Server. The job fails if any test fails, is skipped or is not discovered (including `CartApiTests` and `CartConcurrencyTests`), or if the database is unavailable. On failure the TRX results and container logs are uploaded as the `test-results` artifact; Docker resources are always removed afterwards.
+
+CI uses a throwaway SQL password defined in the workflow (`Ci_Only_Passw0rd!`) for the ephemeral runner; there are no repository secrets. CI does not deploy or publish anything. The workflow file passes `actionlint` and its steps were exercised locally (including a forced failure), but it has **not yet been observed running on GitHub**.
+
 ## Health and logging
 
 - `GET /health/live` — always `200` while the process runs; it runs no checks, so it does not fail when SQL Server is down.
@@ -194,10 +200,11 @@ The script (1) runs `docker compose up --build -d --wait`, (2) sends a real `POS
 | `rowversion` → strong ETag, mandatory `If-Match`, 412/428/400, atomic version check in one transaction | **Implemented and tested**, including simultaneous requests |
 | Docker Compose (API + SQL Server, health gating, migrations + seed on start, named volume) | **Implemented**; verified by `scripts/verify-docker.ps1` on the author's machine |
 | `/health/live`, `/health/ready`, structured console logs | **Implemented and tested** |
+| GitHub Actions CI (`.github/workflows/ci.yml`) | **Implemented**; linted and exercised locally, **remote run not yet verified** |
 | Identity provider / OAuth, ownership checks | Conceptual only (`docs/architecture.md`); **not implemented** |
 | Catalog, pricing, inventory reservation, checkout, payments, orders | **Out of scope**; not implemented |
-| Azure deployment, CI/CD pipeline, Redis, message broker, outbox, idempotent payments, OpenTelemetry | Conceptual only; **not implemented** |
+| Azure deployment, deployment/CD pipeline, Redis, message broker, outbox, idempotent payments, OpenTelemetry | Conceptual only; **not implemented** |
 
-Possible future improvements: authentication and per-owner carts; cart expiry cleanup; GitHub Actions PR build/test; `If-None-Match`; load and deadlock testing; production-grade configuration and secrets handling; non-`sa` database login.
+Possible future improvements: authentication and per-owner carts; cart expiry cleanup; pinning GitHub Actions to commit SHAs and caching NuGet packages; `If-None-Match`; load and deadlock testing; production-grade configuration and secrets handling; non-`sa` database login.
 
 The documents in `docs/` describe the conceptual platform and the implementation plan; the README describes what this repository actually contains.
