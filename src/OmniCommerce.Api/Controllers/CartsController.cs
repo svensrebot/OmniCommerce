@@ -10,7 +10,6 @@ namespace OmniCommerce.Api.Controllers;
 // version (412), then the rest (item/product errors).
 [ApiController]
 [Route("api/carts")]
-[Produces("application/json")]
 public class CartsController(ICartService carts) : ControllerBase
 {
     [HttpPost]

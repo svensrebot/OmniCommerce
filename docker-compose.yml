@@ -1,0 +1,43 @@
+# LOCAL DEVELOPMENT ONLY. Not a production deployment: the API has no authentication, runs in the
+# Development environment and applies EF Core migrations on startup.
+#
+#   docker compose up --build        API: http://localhost:8080   SQL Server: localhost,1433 (loopback only)
+#
+# The SA password defaults to a local-development example value. Override it with the MSSQL_SA_PASSWORD
+# environment variable (or an untracked .env file); it must satisfy SQL Server's complexity rules and
+# avoid ';' and '$'. Never commit a real password.
+name: omnicommerce
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Dev_Only_Passw0rd!}
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  api:
+    build: .
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__MigrateOnStartup: "true"
+      ConnectionStrings__CommerceDb: Server=sqlserver;Database=OmniCommerce;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Dev_Only_Passw0rd!};TrustServerCertificate=True
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: on-failure
+
+volumes:
+  sqlserver-data:
